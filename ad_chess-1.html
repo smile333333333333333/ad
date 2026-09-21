@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AD CHESS</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#171717;color:#eee;font-family:Arial,sans-serif;text-align:center}
+h1{margin:18px 0 4px;font-size:38px;letter-spacing:3px}
+#sub{color:#aaa;margin-bottom:12px}
+#game{display:flex;flex-direction:column;align-items:center}
+#status{font-size:20px;margin:10px}
+#board{width:min(92vw,560px);height:min(92vw,560px);display:grid;grid-template-columns:repeat(8,1fr);border:5px solid #111;box-shadow:0 8px 25px #000}
+.sq{display:flex;align-items:center;justify-content:center;font-size:clamp(30px,8vw,58px);cursor:pointer;user-select:none;position:relative}
+.light{background:#f0d9b5}.dark{background:#b58863}
+.selected{outline:5px solid #ffe45e;outline-offset:-5px}
+.legal:after{content:"";width:22%;height:22%;border-radius:50%;background:#0006;position:absolute}
+.capture:after{content:"";width:82%;height:82%;border:5px solid #0005;border-radius:50%;position:absolute}
+.white{filter:drop-shadow(0 2px 1px #000);}.black{filter:drop-shadow(0 2px 1px #fff4)}
+button{margin:10px 5px;padding:10px 16px;border:0;border-radius:7px;background:#eee;color:#111;font-weight:bold;cursor:pointer}
+button:hover{background:#ddd}
+#moveList{max-width:560px;width:92vw;margin:10px auto;color:#aaa;min-height:25px}
+#overlay{display:none;position:fixed;inset:0;background:#111e;z-index:10;align-items:center;justify-content:center;padding:20px}
+#ad{width:min(92vw,520px);background:white;color:#111;border-radius:12px;box-shadow:0 15px 60px #000;padding:0;overflow:hidden;text-align:left}
+#adTop{background:#eee;padding:8px 12px;font-size:12px;color:#777}
+#adBody{padding:28px 25px;text-align:center;min-height:260px;display:flex;flex-direction:column;justify-content:center}
+#adBody h2{font-size:34px;margin:8px}
+#adBody p{font-size:19px;line-height:1.4}
+#adClose{background:#111;color:white;margin:5px auto 0}
+#adClose:disabled{opacity:.35;cursor:not-allowed}
+#count{font-size:12px;color:#777;margin-top:8px}
+</style>
+</head>
+<body>
+<h1>♟ AD CHESS ♟</h1>
+<div id="sub">A perfectly normal game of chess. Probably.</div>
+<div id="game">
+  <div id="status"></div>
+  <div id="board"></div>
+  <div id="moveList"></div>
+  <div><button onclick="newGame()">NEW GAME</button><button onclick="flipBoard()">FLIP BOARD</button></div>
+</div>
+
+<div id="overlay">
+  <div id="ad">
+    <div id="adTop">ADVERTISEMENT • You must watch this before continuing</div>
+    <div id="adBody"></div>
+    <button id="adClose" disabled>Continue</button>
+    <div id="count"></div>
+  </div>
+</div>
+
+<script>
+const pieces={
+ w:{K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘",P:"♙"},
+ b:{K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"}
+};
+const ads=[
+ ["👁️","BUY AN EYEBALL","Need an eyeball? We've got eyeballs.<br><b>$14.99 — Left or right available!</b>"],
+ ["🍔","THE ILLEGAL BURGER PLACE","THE TOTALLY LEGIT BURGER PLACE<br><br>We have burgers. We have absolutely no idea if we're allowed to sell them."],
+ ["📺","AD WATCHERS","A brand-new TV show about people watching advertisements.<br><br><b>Tonight at 8:00:</b> people watch commercials."],
+ ["🧦","SINGLE SOCK EMPORIUM","We sell socks.<br><br><b>Only one sock at a time.</b>"],
+ ["🪨","PREMIUM ROCKS","Tired of ordinary rocks?<br><br>Upgrade to <b>Premium Rock™</b> for only $39.99."],
+ ["🥄","THE SPOON STORE","Spoons.<br>That's it.<br><br><b>BUY SPOONS NOW</b>"],
+ ["🐟","FISH RENTAL","Need a fish but don't want the commitment?<br><br>Rent one today!"],
+ ["🚪","DOOR SUBSCRIPTION","Every month, we'll send you a new door.<br><br><b>You don't get a wall.</b>"],
+ ["📦","EMPTY BOXES","What's inside?<br><b>Nothing.</b><br>And that's the point."],
+ ["♟️","CHESS PREMIUM","Tired of advertisements interrupting your chess game?<br><br>Upgrade to Chess Premium!<br><b>$19.99/month</b>"],
+ ["📺","ADVERTISEMENT PREMIUM","Want MORE advertisements?<br><br>Subscribe to Advertisement Premium!<br><b>Now with 300% more ads!</b>"],
+ ["🪑","THE SITTING DEVICE","Introducing The Sitting Device.<br>It's basically a chair.<br><br>But legally, it's not."],
+ ["🧱","BRICK OF THE MONTH CLUB","One brick.<br>Every month.<br>Forever."],
+ ["🧠","THE BRAIN STORE","Running low on brain?<br><br>We've got brains!<br><small>Probably.</small>"]
+];
+
+let board,turn,selected,flip=false,moves=[],adNumber=0;
+
+function newGame(){
+ board=[
+ ["bR","bN","bB","bQ","bK","bB","bN","bR"],
+ ["bP","bP","bP","bP","bP","bP","bP","bP"],
+ [null,null,null,null,null,null,null,null],
+ [null,null,null,null,null,null,null,null],
+ [null,null,null,null,null,null,null,null],
+ [null,null,null,null,null,null,null,null],
+ ["wP","wP","wP","wP","wP","wP","wP","wP"],
+ ["wR","wN","wB","wQ","wK","wB","wN","wR"]];
+ turn="w";selected=null;moves=[];adNumber=0;render();
+}
+function flipBoard(){flip=!flip;render()}
+function render(){
+ const el=document.getElementById("board");el.innerHTML="";
+ const rows=[0,1,2,3,4,5,6,7], cols=[0,1,2,3,4,5,6,7];
+ if(flip){rows.reverse();cols.reverse()}
+ rows.forEach(r=>cols.forEach(c=>{
+   const s=document.createElement("div");
+   s.className="sq "+((r+c)%2?"dark":"light");
+   if(selected&&selected.r===r&&selected.c===c)s.classList.add("selected");
+   if(selected&&legalMoves(selected.r,selected.c).some(x=>x.r===r&&x.c===c))
+     s.classList.add(board[r][c]?"capture":"legal");
+   if(board[r][c]){
+     s.textContent=pieces[board[r][c][0]][board[r][c][1]];
+     s.classList.add(board[r][c][0]==="w"?"white":"black");
+   }
+   s.onclick=()=>clickSquare(r,c);
+   el.appendChild(s);
+ }));
+ document.getElementById("status").textContent=(turn==="w"?"White":"Black")+" to move";
+ document.getElementById("moveList").textContent=moves.length?moves.join("   "):"Make the first move.";
+}
+function clickSquare(r,c){
+ if(selected){
+   const lm=legalMoves(selected.r,selected.c);
+   if(lm.some(x=>x.r===r&&x.c===c)){
+     makeMove(selected.r,selected.c,r,c);return;
+   }
+ }
+ if(board[r][c]&&board[r][c][0]===turn){selected={r,c};render()}
+}
+function inside(r,c){return r>=0&&r<8&&c>=0&&c<8}
+function legalMoves(r,c){
+ const p=board[r][c]; if(!p||p[0]!==turn)return [];
+ const color=p[0],type=p[1],out=[];
+ const add=(rr,cc)=>{if(inside(rr,cc)&&(!board[rr][cc]||board[rr][cc][0]!==color))out.push({r:rr,c:cc})};
+ if(type==="P"){
+   let d=color==="w"?-1:1,start=color==="w"?6:1;
+   if(inside(r+d,c)&&!board[r+d][c]){
+     out.push({r:r+d,c}); if(r===start&&!board[r+2*d][c])out.push({r:r+2*d,c});
+   }
+   [-1,1].forEach(dc=>{if(inside(r+d,c+dc)&&board[r+d][c+dc]&&board[r+d][c+dc][0]!==color)out.push({r:r+d,c:c+dc})});
+ } else if(type==="N"){
+   [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([a,b])=>add(r+a,c+b));
+ } else if(type==="K"){
+   for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)if(a||b)add(r+a,c+b);
+ } else {
+   let dirs=[];
+   if(type==="B"||type==="Q")dirs.push([-1,-1],[-1,1],[1,-1],[1,1]);
+   if(type==="R"||type==="Q")dirs.push([-1,0],[1,0],[0,-1],[0,1]);
+   dirs.forEach(([dr,dc])=>{
+     let rr=r+dr,cc=c+dc;
+     while(inside(rr,cc)){
+       if(!board[rr][cc])out.push({r:rr,c:cc});
+       else {if(board[rr][cc][0]!==color)out.push({r:rr,c:cc});break}
+       rr+=dr;cc+=dc;
+     }
+   });
+ }
+ return out;
+}
+function makeMove(r1,c1,r2,c2){
+ const p=board[r1][c1],captured=board[r2][c2];
+ board[r2][c2]=p;board[r1][c1]=null;
+ // Simple promotion
+ if(p[1]==="P"&&(r2===0||r2===7))board[r2][c2]=p[0]+"Q";
+ const name=String.fromCharCode(97+c1)+(8-r1)+"-"+String.fromCharCode(97+c2)+(8-r2);
+ moves.push((turn==="w"?"W: ":"B: ")+name+(captured?" x":""));
+ turn=turn==="w"?"b":"w";selected=null;render();
+ showAd();
+}
+function showAd(){
+ const [icon,title,text]=ads[adNumber%ads.length];adNumber++;
+ document.getElementById("adBody").innerHTML=`<div style="font-size:55px">${icon}</div><h2>${title}</h2><p>${text}</p>`;
+ const btn=document.getElementById("adClose"),count=document.getElementById("count");
+ btn.disabled=true;let n=3;btn.textContent="Continue ("+n+")";count.textContent="Ad #"+adNumber;
+ const timer=setInterval(()=>{n--;btn.textContent=n?"Continue ("+n+")":"Continue";if(!n){clearInterval(timer);btn.disabled=false}},700);
+ btn.onclick=()=>{document.getElementById("overlay").style.display="none"};
+ document.getElementById("overlay").style.display="flex";
+}
+newGame();
+</script>
+</body>
+</html>
